@@ -296,9 +296,9 @@ export function ReportPage() {
             const { data: result, error: rpcError } = await supabase.rpc(
                 'get_user_performance_report',
                 {
-                    target_public_id: public_id,
-                    start_date: format(dateRange.from, 'yyyy-MM-dd'),
-                    end_date: format(dateRange.to, 'yyyy-MM-dd'),
+                    p_public_id: public_id,
+                    p_start_date: format(dateRange.from, 'yyyy-MM-dd'),
+                    p_end_date: format(dateRange.to, 'yyyy-MM-dd'),
                 }
             )
 
