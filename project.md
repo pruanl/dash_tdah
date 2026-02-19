@@ -56,7 +56,7 @@ Crie uma página de Dashboard de Relatório de Performance em React usando Tailw
 - Filtro: Adicione um Date Range Picker do Shadcn no topo direito. O padrão deve ser os últimos 7 dias.
 
 3. Layout do Relatório:
-- Hero: "Relatório de Foco - [user_name]".
+- Hero: "Raio-X - [user_name]".
 - Grid de 3 Cards: 
     1. "Concluídas" (Destaque o número em Verde #22c55e).
     2. "Pendentes" (Destaque em Amarelo/Laranja).

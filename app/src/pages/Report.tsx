@@ -366,7 +366,7 @@ export function ReportPage() {
                     <div className="space-y-2">
                         <div className="flex items-center gap-3">
                             <h1 className="text-2xl font-bold tracking-tight text-zinc-100 md:text-3xl">
-                                Relatório de Foco
+                                Raio-X
                             </h1>
                             <Badge
                                 variant="outline"
