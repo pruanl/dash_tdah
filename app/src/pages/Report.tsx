@@ -20,6 +20,7 @@ import { MetricCard } from '@/components/MetricCard'
 import { EfficiencyCircle } from '@/components/EfficiencyCircle'
 import { DailyChart } from '@/components/DailyChart'
 import { StoryCard } from '@/components/StoryCard'
+import { TipCard } from '@/components/TipCard'
 import { ReportSkeleton } from '@/components/ReportSkeleton'
 
 interface ReportData {
@@ -419,17 +420,16 @@ export function ReportPage() {
                     </Card>
                 </div>
 
-                {/* Chart + Stories Grid */}
+                {/* Chart + Dica (esquerda) | Histórias (direita) */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-                    <div className="lg:col-span-3">
+                    <div className="flex flex-col gap-4 lg:col-span-3">
                         <DailyChart dailyHistory={data.daily_history} />
+                        <TipCard />
                     </div>
                     <div className="lg:col-span-2">
                         <StoryCard />
                     </div>
                 </div>
-
-                {/* Footer */}
                 <footer className="pb-6 text-center">
                     <p className="text-xs text-zinc-600">
                         Powered by{' '}
