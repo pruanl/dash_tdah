@@ -9,6 +9,7 @@ import {
     SearchX,
     CalendarX2,
     ShieldAlert,
+    Lock,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -30,9 +31,102 @@ interface ReportData {
     total_period_tasks: number
     completion_rate: string
     daily_history: Record<string, number>
+    is_valid?: boolean
 }
 
-type ErrorType = 'not_found' | 'invalid_date' | 'generic'
+type ErrorType = 'not_found' | 'invalid_date' | 'generic' | 'invalid_pin'
+
+// ─── Local Storage Utils ─────────────────────────────────────────────────
+
+const getStoredPin = (publicId: string) => {
+    try {
+        const stored = localStorage.getItem(`tdah_auth_${publicId}`)
+        if (stored) {
+            const parsed = JSON.parse(stored)
+            const age = Date.now() - parsed.timestamp
+            const maxAge = 72 * 60 * 60 * 1000 // 72 hours
+            if (age < maxAge && parsed.pin) {
+                return parsed.pin
+            }
+        }
+    } catch (e) { }
+    return null
+}
+
+const savePin = (publicId: string, pin: string) => {
+    localStorage.setItem(
+        `tdah_auth_${publicId}`,
+        JSON.stringify({ pin, timestamp: Date.now() })
+    )
+}
+
+const clearPin = (publicId: string) => {
+    localStorage.removeItem(`tdah_auth_${publicId}`)
+}
+
+// ─── PIN Modal Component ─────────────────────────────────────────────────
+
+function PinModal({
+    isOpen,
+    onSubmit,
+}: {
+    isOpen: boolean
+    onSubmit: (pin: string) => void
+}) {
+    const [pin, setPin] = useState('')
+
+    if (!isOpen) return null
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
+            <Card className="w-full max-w-sm border-zinc-800 bg-zinc-900 shadow-2xl">
+                <CardContent className="flex flex-col gap-6 p-6">
+                    <div className="space-y-2 text-center">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10">
+                            <Lock className="h-6 w-6 text-blue-400" />
+                        </div>
+                        <h2 className="text-xl font-bold text-zinc-100">
+                            Autenticação
+                        </h2>
+                        <p className="text-sm text-zinc-400">
+                            Informe os 4 últimos dígitos do seu telefone para acessar o relatório.
+                        </p>
+                    </div>
+
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault()
+                            if (pin.length === 4) onSubmit(pin)
+                        }}
+                        className="space-y-4"
+                    >
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={4}
+                            value={pin}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '')
+                                if (val.length <= 4) setPin(val)
+                            }}
+                            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-center text-3xl font-bold tracking-[0.5em] text-zinc-100 placeholder:text-zinc-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="0000"
+                            autoFocus
+                        />
+                        <Button
+                            type="submit"
+                            disabled={pin.length !== 4}
+                            className="w-full bg-blue-600 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            Verificar
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
 
 /**
  * Parses and validates date params from URL query string.
@@ -137,6 +231,14 @@ function ErrorScreen({
             gradient: 'from-zinc-500/20 to-zinc-600/20',
             iconColor: 'text-zinc-400',
             borderColor: 'border-zinc-600/20',
+        },
+        invalid_pin: {
+            icon: Lock,
+            emoji: '🔒',
+            title: 'Acesso Negado',
+            gradient: 'from-red-500/20 to-rose-500/20',
+            iconColor: 'text-red-400',
+            borderColor: 'border-red-500/20',
         },
     }
 
@@ -244,6 +346,17 @@ export function ReportPage() {
     const [error, setError] = useState<string | null>(null)
     const [errorType, setErrorType] = useState<ErrorType>('generic')
 
+    const [phonePin, setPhonePin] = useState<string | null>(() => {
+        if (!public_id) return null
+        return getStoredPin(public_id)
+    })
+    const [isPinModalOpen, setIsPinModalOpen] = useState(() => !phonePin)
+
+    const handlePinSubmit = useCallback((pin: string) => {
+        setPhonePin(pin)
+        setIsPinModalOpen(false)
+    }, [])
+
     // Parse dates from URL query params
     const parsedDates = useMemo(
         () => parseDateParams(searchParams),
@@ -279,6 +392,7 @@ export function ReportPage() {
 
     const fetchReport = useCallback(async () => {
         if (!public_id) return
+        if (!phonePin) return
 
         // If parsed dates have an error, show invalid date screen
         if (parsedDates.error) {
@@ -300,6 +414,7 @@ export function ReportPage() {
                     p_public_id: public_id,
                     p_start_date: format(dateRange.from, 'yyyy-MM-dd'),
                     p_end_date: format(dateRange.to, 'yyyy-MM-dd'),
+                    p_phone_last_4: phonePin,
                 }
             )
 
@@ -308,7 +423,16 @@ export function ReportPage() {
             }
 
             if (result && result.length > 0) {
-                setData(result[0])
+                if (result[0].is_valid === false) {
+                    clearPin(public_id)
+                    setPhonePin(null)
+                    setError('Os 4 últimos dígitos informados não conferem com o nosso cadastro.')
+                    setErrorType('invalid_pin')
+                    setData(null)
+                } else {
+                    savePin(public_id, phonePin)
+                    setData(result[0])
+                }
             } else {
                 setData(null)
                 setError(
@@ -325,13 +449,22 @@ export function ReportPage() {
         } finally {
             setLoading(false)
         }
-    }, [public_id, dateRange, parsedDates.error])
+    }, [public_id, dateRange, parsedDates.error, phonePin])
 
     useEffect(() => {
         fetchReport()
     }, [fetchReport])
 
     // ── Render States ────────────────────────────────────────────────────
+
+    if (isPinModalOpen) {
+        return (
+            <div className="min-h-screen bg-[#09090b]">
+                <ReportSkeleton />
+                <PinModal isOpen={isPinModalOpen} onSubmit={handlePinSubmit} />
+            </div>
+        )
+    }
 
     if (loading) {
         return (
@@ -347,7 +480,14 @@ export function ReportPage() {
                 type={errorType}
                 message={error || 'Relatório não encontrado.'}
                 onRetry={
-                    errorType !== 'invalid_date' ? () => fetchReport() : undefined
+                    errorType === 'invalid_pin'
+                        ? () => {
+                            setError(null)
+                            setIsPinModalOpen(true)
+                        }
+                        : errorType !== 'invalid_date'
+                            ? () => fetchReport()
+                            : undefined
                 }
             />
         )
